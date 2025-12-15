@@ -8,8 +8,37 @@ import { findCssLineInSource } from "../utils/css-matcher";
 import CodePanel from "./CodePanel";
 import styles from "./DevInspector.module.css";
 
-// Cache pour stocker les fichiers déjà lus
 const fileCache = {};
+
+// 🚫 LISTE NOIRE : Les composants internes de Next.js à ignorer
+const IGNORED_COMPONENTS = [
+  "DevInspector",
+  "CodePanel",
+  "CodeViewer", // Nos outils
+  "SegmentViewNode",
+  "SegmentStateProvider",
+  "OuterLayoutRouter", // 👈 AJOUTÉ ICI
+  "LayoutRouterContext",
+  "InnerLayoutRouter",
+  "RedirectErrorBoundary",
+  "RedirectBoundary",
+  "HTTPAccessFallbackErrorBoundary",
+  "HTTPAccessFallbackBoundary",
+  "LoadingBoundary",
+  "ErrorBoundary",
+  "InnerScrollAndFocusHandler",
+  "ScrollAndFocusHandler",
+  "RenderFromTemplateContext",
+  "TemplateContext",
+  "AppRouter",
+  "ServerRoot",
+  "Root",
+  "Head",
+  "Body",
+  "Html",
+  "Container",
+  "App",
+];
 
 export default function DevInspector({ children }) {
   const [targetInfo, setTargetInfo] = useState(null);
@@ -18,7 +47,8 @@ export default function DevInspector({ children }) {
   useEffect(() => {
     const handleMouseOver = async (e) => {
       const target = e.target;
-      // Ignore les éléments de structure globaux
+
+      // 🛑 NOUVEAU FILTRE : Ignorer l'inspecteur lui-même et ses sous-composants
       if (
         target.tagName === "BODY" ||
         target.tagName === "HTML" ||
@@ -26,31 +56,45 @@ export default function DevInspector({ children }) {
       )
         return;
 
+      // Vérifie si l'élément survolé fait partie de l'inspecteur (panneaux de code)
+      const inspectorElement = document.getElementById("inspector");
+      if (
+        inspectorElement &&
+        inspectorElement.contains(target) &&
+        target.closest(`.${styles.inspectorPanel}`)
+      ) {
+        // Si l'élément est à l'intérieur d'un panneau de code, on ignore l'événement
+        target.style.outline = ""; // Enlève l'outline si elle était restée
+        return;
+      }
+
       const fiber = getFiberFromElement(target);
       if (!fiber) return;
 
-      // 1. DÉTECTION DU COMPOSANT
+      // 1. DÉTECTION DU COMPOSANT (Avec filtrage)
       let current = fiber;
       let componentName = null;
+
       while (current) {
         if (current.type && typeof current.type === "function") {
-          componentName = current.type.name || current.type.displayName;
-          // On ignore nos propres composants d'outillage
-          if (
-            componentName &&
-            !["DevInspector", "CodePanel", "CodeViewer"].includes(componentName)
-          )
+          const name = current.type.name || current.type.displayName;
+
+          if (name && !IGNORED_COMPONENTS.includes(name)) {
+            componentName = name;
             break;
+          }
         }
         current = current.return;
       }
+
       if (!componentName) return;
 
-      // Chemins supposés
+      // ... (Le reste de la logique reste inchangé) ...
+
       const jsxFileName = `app/components/${componentName}.jsx`;
       const cssFileName = `app/components/${componentName}.module.css`;
 
-      // 2. RÉCUPÉRATION DU CODE ONCLICK (Signature)
+      // 2. RÉCUPÉRATION DU CODE ONCLICK
       let propSignature = null;
       if (fiber.memoizedProps && fiber.memoizedProps.onClick) {
         try {
@@ -63,15 +107,14 @@ export default function DevInspector({ children }) {
         }
       }
 
-      // 3. CHARGEMENT DES FICHIERS (JSX et CSS)
-      // On ne lance la requête que si les fichiers ne sont pas en cache
+      // 3. CHARGEMENT DES FICHIERS
       if (
         (!fileCache[jsxFileName] || !fileCache[cssFileName]) &&
         !isFetchingRef.current
       ) {
         isFetchingRef.current = true;
         try {
-          // On essaie de charger les deux en parallèle
+          // Requêtes en parallèle
           const [resJsx, resCss] = await Promise.all([
             fetch(`/api/read-file?path=${jsxFileName}`),
             fetch(`/api/read-file?path=${cssFileName}`),
@@ -80,12 +123,14 @@ export default function DevInspector({ children }) {
           if (resJsx.ok) {
             const data = await resJsx.json();
             fileCache[jsxFileName] = data.content;
+          } else {
+            fileCache[jsxFileName] = null;
           }
+
           if (resCss.ok) {
             const data = await resCss.json();
             fileCache[cssFileName] = data.content;
           } else {
-            // Si pas de CSS trouvé, on cache une chaine vide pour ne pas réessayer en boucle
             fileCache[cssFileName] = "";
           }
         } catch (err) {
@@ -100,7 +145,7 @@ export default function DevInspector({ children }) {
 
       if (!jsxSourceCode) return;
 
-      // 4. ANALYSE JSX (Trouver la ligne du composant)
+      // 4. ANALYSE JSX
       const cleanText = target.innerText
         ? target.innerText.replace(/\s+/g, " ").trim().substring(0, 30)
         : "";
@@ -112,33 +157,19 @@ export default function DevInspector({ children }) {
         propSignature
       );
 
-      // 5. ANALYSE CSS (Trouver la ligne du style)
-      let cssLine = null;
-      const classUsed = target.getAttribute("class");
-      if (cssSourceCode && classUsed) {
-        // On filtre pour ne garder que les classes qui ressemblent à des modules (avec un underscore)
-        const classes = classUsed.split(" ").filter((c) => c.includes("_"));
-        for (const rawClass of classes) {
-          const line = findCssLineInSource(cssSourceCode, rawClass);
-          if (line) {
-            cssLine = line;
-            break; // On s'arrête à la première classe trouvée
-          }
-        }
-      }
+      // 5. ANALYSE CSS
+      const rawClasses = target.getAttribute("class") || "";
+      const cssLine = findCssLineInSource(cssSourceCode, rawClasses);
 
       if (jsxLine) {
         setTargetInfo({
           component: componentName,
-          // Données JSX
           jsxFile: jsxFileName,
           jsxLine: jsxLine,
           jsxSourceCode: jsxSourceCode,
-          // Données CSS
           cssFile: cssFileName,
           cssLine: cssLine,
           cssSourceCode: cssSourceCode,
-          // Infos élément
           element: target.tagName.toLowerCase(),
         });
         target.style.outline = "2px solid #00ff00";
@@ -146,6 +177,16 @@ export default function DevInspector({ children }) {
     };
 
     const handleMouseOut = (e) => {
+      // 🛑 FILTRE MOUSEOUT : S'assurer que le mouseout n'est traité que si on quitte un élément de l'application
+      const inspectorElement = document.getElementById("inspector");
+      // Si l'élément que l'on quitte est à l'intérieur d'un panneau de l'inspecteur, on ignore
+      if (
+        inspectorElement &&
+        inspectorElement.contains(e.target) &&
+        e.target.closest(`.${styles.inspectorPanel}`)
+      ) {
+        return;
+      }
       e.target.style.outline = "";
     };
 
@@ -161,7 +202,7 @@ export default function DevInspector({ children }) {
   return (
     // CONTENEUR GLOBAL: Triple Split
     <div className={styles.containerTripleSplit} id="inspector">
-      {/* 1. GAUCHE : Panneau JSX */}
+      {/* 1. GAUCHE : Panneau JSX (Fait partie de l'inspecteur, doit être ignoré par l'écouteur) */}
       <CodePanel
         title={`⚛️ ${targetInfo?.component || "JSX"}`}
         fileInfo={targetInfo?.jsxFile}
@@ -170,7 +211,7 @@ export default function DevInspector({ children }) {
         isJsx={true}
       />
 
-      {/* 2. CENTRE : Panneau CSS */}
+      {/* 2. CENTRE : Panneau CSS (Fait partie de l'inspecteur, doit être ignoré par l'écouteur) */}
       <CodePanel
         title={`🎨 CSS (${targetInfo?.component || "Styles"})`}
         fileInfo={targetInfo?.cssFile}

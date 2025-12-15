@@ -2,35 +2,43 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import styles from "./CodeViewer.module.css";
 
 export default function CodeViewer({
   sourceCode,
-  highlightTargetLines = [], // Lignes vertes
-  highlightParentLines = [], // Lignes violettes
+  language = "jsx",
+  highlightTargetLines = [],
+  highlightParentLines = [],
 }) {
-  const codeRef = useRef(null);
+  const scrollRef = useRef(null);
 
   useEffect(() => {
-    // Priorité au scroll : on vise d'abord l'enfant (Target), sinon le Parent
     const linesToScroll =
       highlightTargetLines.length > 0
         ? highlightTargetLines
         : highlightParentLines;
 
-    if (codeRef.current && linesToScroll.length > 0) {
-      const firstLine = linesToScroll[0];
-      const container = codeRef.current;
-      const lines = container.children;
+    if (scrollRef.current && linesToScroll.length > 0) {
+      // Index en base 0 pour trouver l'élément DOM
+      const firstLineIndex = linesToScroll[0] - 1;
 
-      if (firstLine <= lines.length) {
-        const targetElement = lines[firstLine - 1];
+      // React-Syntax-Highlighter structure: <pre> -> <code> -> <span>(lignes)
+      const codeElement = scrollRef.current.querySelector("code");
 
-        // Calcul manuel du scroll pour centrer la ligne
+      if (codeElement && codeElement.children[firstLineIndex]) {
+        const targetElement = codeElement.children[firstLineIndex];
+        const container = scrollRef.current;
+
+        // 🟢 RESTAURATION DU CALCUL MANUEL (ANTI-SAUT)
+        // On calcule mathématiquement où aller au lieu de demander au navigateur
         const containerHeight = container.clientHeight;
         const elementTop = targetElement.offsetTop;
         const elementHeight = targetElement.clientHeight;
 
+        // Formule pour centrer l'élément :
+        // Position de l'élément - Moitié de l'écran + Moitié de la hauteur de l'élément
         const scrollTarget =
           elementTop - containerHeight / 2 + elementHeight / 2;
 
@@ -52,30 +60,46 @@ export default function CodeViewer({
     );
   }
 
-  const lines = sourceCode.split("\n");
-
   return (
-    <div className={styles.viewerContainer} ref={codeRef}>
-      {lines.map((lineContent, index) => {
-        const lineNumber = index + 1;
+    <div className={styles.viewerContainer} ref={scrollRef}>
+      <SyntaxHighlighter
+        language={language}
+        style={vscDarkPlus}
+        showLineNumbers={true}
+        wrapLines={true}
+        customStyle={{
+          margin: 0,
+          padding: "1rem",
+          backgroundColor: "transparent",
+          fontSize: "13px",
+          fontFamily: '"Courier New", Courier, monospace',
+        }}
+        lineNumberStyle={{
+          minWidth: "2.5em",
+          paddingRight: "1em",
+          textAlign: "right",
+          color: "#6e7681",
+        }}
+        lineProps={(lineNumber) => {
+          const isTarget = highlightTargetLines.includes(lineNumber);
+          const isParent = highlightParentLines.includes(lineNumber);
 
-        const isTarget = highlightTargetLines.includes(lineNumber);
-        const isParent = highlightParentLines.includes(lineNumber);
+          let className = styles.codeLine;
 
-        let highlightClass = "";
-        if (isTarget) {
-          highlightClass = styles.lineHighlightedTarget; // Vert prioritaire
-        } else if (isParent) {
-          highlightClass = styles.lineHighlightedParent; // Violet
-        }
+          if (isTarget) {
+            className += ` ${styles.lineHighlightedTarget}`;
+          } else if (isParent) {
+            className += ` ${styles.lineHighlightedParent}`;
+          }
 
-        return (
-          <div key={lineNumber} className={`${styles.line} ${highlightClass}`}>
-            <span className={styles.lineNumber}>{lineNumber}</span>
-            <pre className={styles.code}>{lineContent}</pre>
-          </div>
-        );
-      })}
+          return {
+            style: { display: "block", width: "100%" },
+            className: className,
+          };
+        }}
+      >
+        {sourceCode}
+      </SyntaxHighlighter>
     </div>
   );
 }

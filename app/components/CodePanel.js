@@ -7,15 +7,17 @@ import styles from "./DevInspector.module.css";
 export default function CodePanel({
   title,
   fileInfo,
-  targetLines = [], // Reçoit les lignes vertes
-  parentLines = [], // Reçoit les lignes violettes
+  targetLines = [],
+  parentLines = [],
   sourceCode,
-  isJsx = true,
+  isJsx = true, // On utilise cette prop pour déterminer le langage
   stats,
 }) {
-  // Pour l'info-bulle en haut, on combine tout
   const combinedLines = [...targetLines, ...parentLines].sort((a, b) => a - b);
   const displayLines = combinedLines.length > 0 ? combinedLines.join(", ") : "";
+
+  // 🟢 Détermine le langage pour SyntaxHighlighter
+  const language = isJsx ? "jsx" : "css";
 
   return (
     <div className={styles.inspectorPanel}>
@@ -51,6 +53,7 @@ export default function CodePanel({
         {sourceCode ? (
           <CodeViewer
             sourceCode={sourceCode}
+            language={language} // 🟢 On passe la prop
             highlightTargetLines={targetLines}
             highlightParentLines={parentLines}
           />

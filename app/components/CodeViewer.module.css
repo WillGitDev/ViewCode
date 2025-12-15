@@ -3,12 +3,8 @@
   width: 100%;
   height: 100%;
   overflow: auto;
-  padding: 1rem;
-  background-color: #0d1117;
-  color: #c9d1d9;
-  font-family: "Courier New", Courier, monospace;
-  font-size: 13px;
-  line-height: 1.5;
+  /* Fond global (GitHub Dark / VS Code Dark background) */
+  background-color: #1e1e1e;
   position: relative;
 }
 
@@ -17,58 +13,26 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #484f58;
+  color: #858585;
+  font-family: sans-serif;
+  font-size: 14px;
 }
 
-.line {
-  display: flex;
-  width: 100%;
+/* On cible les lignes générées par la librairie */
+.codeLine {
+  transition: background-color 0.2s;
 }
 
-.line:hover {
-  background-color: #161b22;
-}
-
-.lineHighlighted {
-  background-color: #373e47;
-  border-left: 4px solid #a371f7; /* Bordure violette */
-  color: white;
-}
-
-.line:hover {
-  background-color: #161b22;
-}
-
-/* 🟢 Style pour l'ÉLÉMENT CIBLE (Enfant) - Couleur verte */
+/* 🟢 Style CIBLE (Enfant) - Vert */
 .lineHighlightedTarget {
-  background-color: #1f3724; /* Vert foncé */
-  border-left: 4px solid #00ff00; /* Vert vif */
-  color: white;
+  background-color: #1f3724 !important; /* Force le vert */
+  border-left: 4px solid #00ff00;
 }
 
-/* 🟢 Style pour l'ÉLÉMENT PARENT - Couleur violette */
+/* 🟣 Style PARENT - Violet */
 .lineHighlightedParent {
-  background-color: #2e263d; /* Violet foncé */
-  border-left: 4px solid #a371f7; /* Violet vif */
-  color: #e2e8f0;
-}
-.lineNumber {
-  width: 3rem;
-  text-align: right;
-  padding-right: 1rem;
-  flex-shrink: 0;
-  user-select: none;
-  color: #484f58;
+  background-color: #2e263d !important; /* Force le violet */
+  border-left: 4px solid #a371f7;
 }
 
-.lineHighlighted .lineNumber {
-  color: #c9d1d9;
-  font-weight: bold;
-}
-
-.code {
-  flex-grow: 1;
-  white-space: pre;
-  margin: 0;
-  font-family: inherit;
-}
+/* Suppression des anciennes classes manuelles (.line, .code, .lineNumber) car la librairie gère ça */

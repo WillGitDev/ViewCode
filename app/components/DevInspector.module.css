@@ -78,6 +78,8 @@
   position: relative;
   background-color: #000;
 }
+
+/* Barre de statistiques (Box Model) */
 .statsBar {
   background-color: #0f172a; /* Bleu nuit profond */
   padding: 8px 16px;
@@ -87,7 +89,7 @@
   font-family: monospace;
   font-size: 12px;
   flex-wrap: wrap;
-  flex-shrink: 0; /* Empêche l'écrasement si manque de place */
+  flex-shrink: 0;
 }
 
 .statTag {
@@ -97,4 +99,45 @@
   border-radius: 4px;
   border: 1px solid #334155;
   white-space: nowrap;
+}
+
+/* 🆕 Barre d'outils flottante pour le mode Parent/Enfant */
+.toolbar {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  display: flex;
+  gap: 8px;
+  background-color: rgba(13, 17, 23, 0.9);
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #30363d;
+  backdrop-filter: blur(4px);
+}
+
+.toggleButton {
+  background-color: #21262d;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: monospace;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toggleButton:hover {
+  background-color: #30363d;
+  color: white;
+}
+
+.active {
+  background-color: #1f6feb; /* Bleu GitHub */
+  color: white;
+  border-color: #1f6feb;
 }

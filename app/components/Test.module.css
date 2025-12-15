@@ -1,0 +1,11 @@
+.container {
+  background: grey;
+}
+
+.content {
+  font-weight: 700;
+}
+
+.content:hover {
+  color: black;
+}

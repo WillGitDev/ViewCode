@@ -2,6 +2,7 @@
 "use client";
 import React, { useState } from "react";
 import styles from "./Playground.module.css"; // 👈 Import
+import Test from "./Test.jsx";
 
 export default function Playground() {
   const [count, setCount] = useState(0);
@@ -13,7 +14,7 @@ export default function Playground() {
       <p className={styles.description}>
         Ce code est propre : aucun attribut manuel !
       </p>
-
+      <Test />
       <p>Salut les amis !</p>
 
       <button

@@ -1,41 +1,95 @@
 // app/components/DevInspector.js
-"use client"; // Obligatoire pour les événements
+"use client";
 
-import { useEffect, useState } from "react";
-import {
-  getFiberFromElement,
-  findSourceInFiber,
-} from "../utils/fiber-inspector";
+import { useEffect, useState, useRef } from "react";
+import { getFiberFromElement } from "../utils/fiber-inspector";
+import { findLineInSource } from "../utils/source-matcher";
+import CodeViewer from "./CodeViewer";
+
+const fileCache = {};
 
 export default function DevInspector({ children }) {
   const [targetInfo, setTargetInfo] = useState(null);
+  const isFetchingRef = useRef(false);
 
   useEffect(() => {
-    const handleMouseOver = (e) => {
+    const handleMouseOver = async (e) => {
       const target = e.target;
+      if (target.tagName === "BODY" || target.tagName === "HTML") return;
 
-      // 1. Récupérer le Fiber
       const fiber = getFiberFromElement(target);
-
       if (!fiber) return;
 
-      // 2. Chercher la source en remontant l'arbre
-      const sourceInfo = findSourceInFiber(fiber);
+      // 1. Récupérer le nom du composant
+      let current = fiber;
+      let componentName = null;
+      while (current) {
+        if (current.type && typeof current.type === "function") {
+          componentName = current.type.name || current.type.displayName;
+          if (componentName && componentName !== "DevInspector") break;
+        }
+        current = current.return;
+      }
+      if (!componentName) return;
 
-      if (sourceInfo) {
-        // sourceInfo contient généralement { fileName, lineNumber, columnNumber }
-        console.log("🟢 Source trouvée :", sourceInfo);
+      // 2. EXTRACTION INTELLIGENTE : On récupère le code du onClick
+      // React stocke les props actuelles dans memoizedProps
+      let propSignature = null;
+      if (fiber.memoizedProps && fiber.memoizedProps.onClick) {
+        try {
+          // Convertit la fonction en chaîne : "() => setCount(count + 1)"
+          const fnString = fiber.memoizedProps.onClick.toString();
+          // On nettoie pour faciliter la recherche (enlève les espaces multiples)
+          propSignature = fnString.replace(/\s+/g, " ").trim();
+          console.log("⚡ Signature trouvée :", propSignature);
+        } catch (err) {
+          /* Ignorer */
+        }
+      }
 
+      const fileName = `app/components/${componentName}.jsx`;
+      let sourceCode = fileCache[fileName];
+
+      if (!sourceCode && !isFetchingRef.current) {
+        isFetchingRef.current = true;
+        try {
+          const res = await fetch(`/api/read-file?path=${fileName}`);
+          if (res.ok) {
+            const data = await res.json();
+            sourceCode = data.content;
+            fileCache[fileName] = sourceCode;
+          }
+        } catch (err) {
+          console.error(err);
+        } finally {
+          isFetchingRef.current = false;
+        }
+      }
+
+      if (!sourceCode) return;
+
+      const cleanText = target.innerText
+        ? target.innerText.replace(/\s+/g, " ").trim().substring(0, 30)
+        : "";
+
+      // 3. Appel avec le nouvel argument `propSignature`
+      const lineNumber = findLineInSource(
+        sourceCode,
+        target.tagName,
+        target.getAttribute("class"),
+        cleanText,
+        propSignature // 👈 LE NOUVEL INDICE
+      );
+
+      if (lineNumber) {
         setTargetInfo({
+          file: fileName,
+          line: lineNumber,
+          sourceCode: sourceCode,
           element: target.tagName.toLowerCase(),
-          file: sourceInfo.fileName,
-          line: sourceInfo.lineNumber,
+          component: componentName,
         });
-
-        // Optionnel : Ajouter une bordure visuelle immédiate
-        target.style.outline = "2px solid #ff0000";
-      } else {
-        console.warn("🟠 Pas de source trouvée pour", target.tagName);
+        target.style.outline = "2px solid #00ff00";
       }
     };
 
@@ -44,7 +98,6 @@ export default function DevInspector({ children }) {
       setTargetInfo(null);
     };
 
-    // Attache l'écouteur au document ou au conteneur spécifique
     document.addEventListener("mouseover", handleMouseOver);
     document.addEventListener("mouseout", handleMouseOut);
 
@@ -56,23 +109,45 @@ export default function DevInspector({ children }) {
 
   return (
     <>
-      {targetInfo && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 10,
-            right: 10,
-            background: "#333",
-            color: "#fff",
-            padding: "10px",
-            zIndex: 9999,
-          }}
-        >
-          📄 {targetInfo.file}:{targetInfo.line} <br />
-          🏷️ &lt;{targetInfo.element}&gt;
+      <div style={{ marginBottom: "50vh", transition: "margin-bottom 0.3s" }}>
+        {children}
+      </div>
+      <div
+        style={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          width: "100%",
+          height: "50vh",
+          backgroundColor: "#0d1117",
+          borderTop: "1px solid #30363d",
+          boxShadow: "0 -4px 20px rgba(0,0,0,0.5)",
+          zIndex: 10000,
+          display: "flex",
+          flexDirection: "column",
+          transform: targetInfo ? "translateY(0)" : "translateY(100%)",
+          transition: "transform 0.3s ease-in-out",
+        }}
+      >
+        <div className="flex items-center justify-between px-4 py-2 bg-[#161b22] border-b border-[#30363d]">
+          <div className="flex items-center gap-3">
+            <span className="text-purple-400 font-bold text-sm">
+              ⚛️ {targetInfo?.component}
+            </span>
+            {targetInfo && (
+              <span className="text-xs text-gray-500 font-mono bg-gray-800 px-2 py-1 rounded">
+                {targetInfo.file}:{targetInfo.line}
+              </span>
+            )}
+          </div>
         </div>
-      )}
-      {children}
+        <div className="flex-grow overflow-hidden relative">
+          <CodeViewer
+            sourceCode={targetInfo?.sourceCode}
+            highlightLine={targetInfo?.line}
+          />
+        </div>
+      </div>
     </>
   );
 }

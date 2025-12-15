@@ -14,13 +14,14 @@ export default function Playground() {
       <p className="text-gray-600 mb-6">
         Ce code est propre : aucun attribut manuel !
       </p>
-
+      <p>Salut les amis !</p>
       <button
         onClick={() => setCount(count + 1)}
         className="px-6 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition"
       >
         Compteur : {count}
       </button>
+      <button>Salut les gens</button>
     </div>
   );
 }

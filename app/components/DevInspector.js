@@ -10,7 +10,7 @@ import styles from "./DevInspector.module.css";
 
 const fileCache = {};
 
-// ... (Les fonctions utilitaires IGNORED_COMPONENTS, isInternalComponent, getCleanOneClass restent inchangées)
+// --- UTILITAIRES ---
 const IGNORED_COMPONENTS = [
   "DevInspector",
   "CodePanel",
@@ -70,9 +70,11 @@ const getCleanOneClass = (className, componentName) => {
 export default function DevInspector({ children }) {
   const [targetInfo, setTargetInfo] = useState(null);
 
+  // Modes
   const [isParentMode, setIsParentMode] = useState(false);
-  const [isSelectMode, setIsSelectMode] = useState(false); // Mode Clic (true) ou Mode Survol (false)
+  const [isSelectMode, setIsSelectMode] = useState(false);
 
+  // Refs
   const isParentModeRef = useRef(isParentMode);
   const isSelectModeRef = useRef(isSelectMode);
   const isFetchingRef = useRef(false);
@@ -99,11 +101,11 @@ export default function DevInspector({ children }) {
     }
   };
 
-  // --- CŒUR DE L'INSPECTION (Logique de ciblage inchangée) ---
+  // --- CŒUR DE L'INSPECTION ---
   const inspectTarget = async (target) => {
     const isParentModeActive = isParentModeRef.current;
 
-    // ... (Logique pour ignorer l'inspecteur lui-même) ...
+    // Ignorer l'inspecteur lui-même
     const inspectorElement = document.getElementById("inspector");
     const isInsideInspector =
       inspectorElement &&
@@ -123,12 +125,9 @@ export default function DevInspector({ children }) {
     const fiber = getFiberFromElement(target);
     if (!fiber) return;
 
-    // ... (Logique de Stack, Visuel (outline vert/violet), Fetch et Matching - Code omis pour la clarté) ...
-
-    // --- STACK ---
+    // Stack & Breadcrumbs
     let current = fiber;
     let componentsStack = [];
-
     while (current) {
       if (current.type && typeof current.type === "function") {
         const name = current.type.name || current.type.displayName;
@@ -138,7 +137,6 @@ export default function DevInspector({ children }) {
       }
       current = current.return;
     }
-
     if (componentsStack.length === 0) return;
 
     const breadcrumbs = [...componentsStack].reverse();
@@ -146,6 +144,7 @@ export default function DevInspector({ children }) {
     const parentComponentName = componentsStack[1];
     let componentName = childName;
 
+    // Fiber Component
     let componentFiber = null;
     let temp = fiber;
     while (temp) {
@@ -159,9 +158,8 @@ export default function DevInspector({ children }) {
       temp = temp.return;
     }
 
-    // --- VISUEL ---
+    // Visuel
     const parentElement = target.parentElement;
-
     target.style.outline = "2px solid #00ff00"; // Vert
     lastOutlinedElementRef.current = target;
 
@@ -175,7 +173,7 @@ export default function DevInspector({ children }) {
       lastParentRef.current = parentElement;
     }
 
-    // --- FETCH ---
+    // Fetch
     const jsxFileName = `app/components/${componentName}.jsx`;
     const cssFileName = `app/components/${componentName}.module.css`;
 
@@ -203,13 +201,12 @@ export default function DevInspector({ children }) {
 
     if (!jsxSourceCode) return;
 
-    // --- MATCHING ---
+    // Matching
     let searchTag = target.tagName;
     let searchClass = target.getAttribute("class");
     let searchText = target.innerText
       ? target.innerText.replace(/\s+/g, " ").trim().substring(0, 30)
       : "";
-
     let propSignature = "";
     if (fiber.memoizedProps && fiber.memoizedProps.onClick) {
       try {
@@ -248,7 +245,6 @@ export default function DevInspector({ children }) {
 
     let cssTargetLines = [];
     let cssParentLines = [];
-
     if (cssSourceCode) {
       const targetClasses = target.getAttribute("class") || "";
       cssTargetLines = findCssLineInSource(cssSourceCode, targetClasses);
@@ -262,32 +258,50 @@ export default function DevInspector({ children }) {
       }
     }
 
+    // Props
     const rawProps = componentFiber?.memoizedProps || {};
     const cleanProps = {};
     Object.keys(rawProps).forEach((key) => {
       if (key === "children") return;
       const value = rawProps[key];
-      if (typeof value === "function") {
-        cleanProps[key] = "ƒ()";
-      } else if (typeof value === "object" && value !== null) {
-        if (Array.isArray(value)) {
-          cleanProps[key] = `[${value.length}]`;
-        } else {
-          cleanProps[key] = "{...}";
-        }
-      } else {
-        cleanProps[key] = value;
-      }
+      if (typeof value === "function") cleanProps[key] = "ƒ()";
+      else if (typeof value === "object" && value !== null)
+        cleanProps[key] = Array.isArray(value) ? `[${value.length}]` : "{...}";
+      else cleanProps[key] = value;
     });
 
+    // Box Model
     const computed = window.getComputedStyle(target);
+    const boxModel = {
+      content: {
+        width: Math.round(parseFloat(computed.width)),
+        height: Math.round(parseFloat(computed.height)),
+      },
+      padding: {
+        top: parseFloat(computed.paddingTop) || 0,
+        right: parseFloat(computed.paddingRight) || 0,
+        bottom: parseFloat(computed.paddingBottom) || 0,
+        left: parseFloat(computed.paddingLeft) || 0,
+      },
+      border: {
+        top: parseFloat(computed.borderTopWidth) || 0,
+        right: parseFloat(computed.borderRightWidth) || 0,
+        bottom: parseFloat(computed.borderBottomWidth) || 0,
+        left: parseFloat(computed.borderLeftWidth) || 0,
+      },
+      margin: {
+        top: parseFloat(computed.marginTop) || 0,
+        right: parseFloat(computed.marginRight) || 0,
+        bottom: parseFloat(computed.marginBottom) || 0,
+        left: parseFloat(computed.marginLeft) || 0,
+      },
+    };
+
     const stats = {
-      size: `${Math.round(parseFloat(computed.width))} x ${Math.round(
-        parseFloat(computed.height)
-      )}`,
+      size: `${boxModel.content.width} x ${boxModel.content.height}`,
       display: computed.display,
-      margin: computed.margin !== "0px" ? `M: ${computed.margin}` : "",
       props: cleanProps,
+      boxModel: boxModel,
     };
 
     setTargetInfo({
@@ -305,18 +319,17 @@ export default function DevInspector({ children }) {
       stats: stats,
       isRootReached: isParentModeActive && !parentComponentName,
     });
-    // --- FIN LOGIQUE DE CIBLAGE ---
   };
 
-  // --- LISTENERS (Pour le Mode Survol) ---
+  // --- LISTENERS ---
   useEffect(() => {
     const handleMouseOver = (e) => {
-      if (isSelectModeRef.current) return; // Désactivé si on est en Mode Clic
+      if (isSelectModeRef.current) return;
       inspectTarget(e.target);
     };
 
     const handleMouseOut = (e) => {
-      if (isSelectModeRef.current) return; // Désactivé si on est en Mode Clic
+      if (isSelectModeRef.current) return;
       const inspectorElement = document.getElementById("inspector");
       if (inspectorElement && inspectorElement.contains(e.target)) return;
       clearOutline();
@@ -332,31 +345,27 @@ export default function DevInspector({ children }) {
     };
   }, []);
 
-  // --- 🟢 GESTION DU CLIC SUR L'OVERLAY (Mode Clic) ---
+  // --- GESTION DU CLIC ---
   const handleOverlayClick = (e) => {
     e.preventDefault();
     e.stopPropagation();
 
-    // 1. On cache temporairement l'overlay
+    // 1. Cacher l'overlay
     e.target.style.display = "none";
-
-    // 2. On trouve l'élément réel aux coordonnées de la souris
+    // 2. Trouver la cible
     const realTarget = document.elementFromPoint(e.clientX, e.clientY);
-
-    // 3. On remet l'overlay visible (le re-render de setTargetInfo le ferait aussi)
+    // 3. Réafficher
     e.target.style.display = "block";
 
     if (realTarget) {
-      // 4. On inspecte l'élément trouvé
       inspectTarget(realTarget);
-
-      // 5. 💡 CHANGEMENT MAJEUR : On ne fait RIEN. Le mode sélection (isSelectMode)
-      //    reste VRAI, ce qui permet de cliquer à nouveau sans interférence.
+      // Mode clic reste actif
     }
   };
 
   return (
     <div className={styles.containerTripleSplit} id="inspector">
+      {/* Panneau JSX */}
       <CodePanel
         title={`⚛️ ${targetInfo?.component || "JSX"}`}
         fileInfo={targetInfo?.jsxFile}
@@ -367,6 +376,7 @@ export default function DevInspector({ children }) {
         stats={targetInfo?.stats}
       />
 
+      {/* Panneau CSS */}
       <CodePanel
         title={`🎨 CSS (${targetInfo?.component || "Styles"})`}
         fileInfo={targetInfo?.cssFile}
@@ -377,7 +387,11 @@ export default function DevInspector({ children }) {
         stats={targetInfo?.stats}
       />
 
+      {/* Zone App (Droite) - Structure Fixe/Scrollable */}
       <div className={styles.appContentTripleSplit}>
+        {/* --- COUCHE FIXE (Ne scrolle pas) --- */}
+
+        {/* Fil d'Ariane */}
         {targetInfo?.breadcrumbs && (
           <div className={styles.breadcrumbsContainer}>
             <span style={{ marginRight: "4px" }}>🗺️</span>
@@ -405,30 +419,15 @@ export default function DevInspector({ children }) {
           </div>
         )}
 
-        {/* 🟢 OVERLAY DE SÉLECTION (Actif uniquement en Mode Clic) */}
-        {isSelectMode && (
-          <div
-            className={styles.selectionOverlay}
-            onClick={handleOverlayClick}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-          />
-        )}
-
+        {/* Barre d'Outils */}
         <div className={styles.toolbar}>
-          {/* 🟢 BOUTON DE BASCULEMENT DE MODE */}
           <button
             className={`${styles.toggleButton} ${
               isSelectMode ? styles.active : ""
             }`}
             onClick={() => {
-              // 💡 Si on quitte le mode Clic pour passer au mode Survol (isSelectMode passe de true à false)
-              if (isSelectMode) {
-                clearOutline(); // On retire le surlignage statique
-              }
-              setIsSelectMode(!isSelectMode); // On bascule
+              if (isSelectMode) clearOutline();
+              setIsSelectMode(!isSelectMode);
             }}
             title={
               isSelectMode
@@ -436,7 +435,6 @@ export default function DevInspector({ children }) {
                 : "Cliquer pour passer en mode Clic"
             }
             style={{
-              // Mode Clic (true) est rouge, Mode Survol (false) est par défaut
               border: isSelectMode ? "1px solid #ef4444" : "1px solid #30363d",
               color: isSelectMode ? "#ef4444" : "#c9d1d9",
               fontWeight: isSelectMode ? "bold" : "normal",
@@ -444,7 +442,7 @@ export default function DevInspector({ children }) {
           >
             {isSelectMode ? "🖱️ Mode Clic" : "👆 Mode Survol"}
           </button>
-          {/* Bouton Parent/Enfant (inchangé) */}
+
           <button
             className={`${styles.toggleButton} ${
               isParentMode ? styles.active : ""
@@ -469,7 +467,23 @@ export default function DevInspector({ children }) {
           )}
         </div>
 
-        {children}
+        {/* --- COUCHE SCROLLABLE (Contient le site + l'Overlay) --- */}
+        <div className={styles.scrollableContent}>
+          {/* Overlay confiné ici */}
+          {isSelectMode && (
+            <div
+              className={styles.selectionOverlay}
+              onClick={handleOverlayClick}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+            />
+          )}
+
+          {/* Votre Application */}
+          {children}
+        </div>
       </div>
     </div>
   );

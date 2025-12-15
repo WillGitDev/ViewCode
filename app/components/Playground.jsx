@@ -14,7 +14,7 @@ export default function Playground() {
       <p className={styles.description}>
         Ce code est propre : aucun attribut manuel !
       </p>
-      <Test />
+      <Test titre="Pour tester" actif={false} count={count} />
       <p>Salut les amis !</p>
 
       <button

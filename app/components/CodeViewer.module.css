@@ -3,7 +3,6 @@
   width: 100%;
   height: 100%;
   overflow: auto;
-  /* Fond global (GitHub Dark / VS Code Dark background) */
   background-color: #1e1e1e;
   position: relative;
 }
@@ -18,21 +17,18 @@
   font-size: 14px;
 }
 
-/* On cible les lignes générées par la librairie */
 .codeLine {
   transition: background-color 0.2s;
 }
 
 /* 🟢 Style CIBLE (Enfant) - Vert */
 .lineHighlightedTarget {
-  background-color: #1f3724 !important; /* Force le vert */
+  background-color: #1f3724 !important;
   border-left: 4px solid #00ff00;
 }
 
 /* 🟣 Style PARENT - Violet */
 .lineHighlightedParent {
-  background-color: #2e263d !important; /* Force le violet */
+  background-color: #2e263d !important;
   border-left: 4px solid #a371f7;
 }
-
-/* Suppression des anciennes classes manuelles (.line, .code, .lineNumber) car la librairie gère ça */

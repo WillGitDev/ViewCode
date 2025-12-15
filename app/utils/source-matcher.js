@@ -1,8 +1,5 @@
 // app/utils/source-matcher.js
 
-/**
- * Nettoie une chaîne pour la comparaison
- */
 const normalize = (str) => (str ? str.replace(/\s+/g, " ").trim() : "");
 
 export const findLineInSource = (
@@ -26,10 +23,8 @@ export const findLineInSource = (
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // Optimisation : On cherche au moins le tag
     if (!line.toLowerCase().includes(`<${targetTag}`)) continue;
 
-    // Contexte de 6 lignes pour le scoring
     let blockContext = line;
     for (let j = 1; j < 6 && i + j < lines.length; j++) {
       blockContext += " " + lines[i + j];
@@ -38,21 +33,18 @@ export const findLineInSource = (
     }
     const normBlock = normalize(blockContext);
 
-    // 🟢 CORRECTION ICI : On donne 1 point de base car on a trouvé le TAG.
-    // Cela permet de trouver un élément même si la classe ou le texte ne matchent pas parfaitement.
+    // 🟢 Base score 1 pour avoir trouvé le tag
     let score = 1;
 
     if (targetClass && normBlock.includes(targetClass)) score += 2;
     if (targetText && targetText.length > 2 && normBlock.includes(targetText))
       score += 5;
 
-    // Le "Golden Ticket" : la prop onClick ou autre signature
     if (targetProp && targetProp.length > 5) {
       const funcBody = targetProp.includes("=>")
         ? targetProp.split("=>")[1].trim()
         : targetProp;
       const cleanBody = funcBody.replace(/}$/, "").trim();
-
       if (normBlock.includes(cleanBody)) {
         score += 15;
       }
@@ -60,14 +52,12 @@ export const findLineInSource = (
 
     if (score > maxScore) {
       maxScore = score;
-      bestMatchLine = i + 1; // Base 1
+      bestMatchLine = i + 1;
     }
   }
 
-  // Si aucune ligne de départ n'est trouvée
   if (bestMatchLine === -1) return [];
 
-  // 2. CAPTURE DU BLOC
   const matchedLines = [];
   const startLineIndex = bestMatchLine - 1;
 

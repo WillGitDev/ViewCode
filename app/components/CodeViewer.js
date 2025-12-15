@@ -21,24 +21,18 @@ export default function CodeViewer({
         : highlightParentLines;
 
     if (scrollRef.current && linesToScroll.length > 0) {
-      // Index en base 0 pour trouver l'élément DOM
       const firstLineIndex = linesToScroll[0] - 1;
-
-      // React-Syntax-Highlighter structure: <pre> -> <code> -> <span>(lignes)
       const codeElement = scrollRef.current.querySelector("code");
 
       if (codeElement && codeElement.children[firstLineIndex]) {
         const targetElement = codeElement.children[firstLineIndex];
         const container = scrollRef.current;
 
-        // 🟢 RESTAURATION DU CALCUL MANUEL (ANTI-SAUT)
-        // On calcule mathématiquement où aller au lieu de demander au navigateur
+        // Calcul manuel Anti-Saut
         const containerHeight = container.clientHeight;
         const elementTop = targetElement.offsetTop;
         const elementHeight = targetElement.clientHeight;
 
-        // Formule pour centrer l'élément :
-        // Position de l'élément - Moitié de l'écran + Moitié de la hauteur de l'élément
         const scrollTarget =
           elementTop - containerHeight / 2 + elementHeight / 2;
 

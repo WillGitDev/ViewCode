@@ -10,13 +10,11 @@ export default function CodePanel({
   targetLines = [],
   parentLines = [],
   sourceCode,
-  isJsx = true, // On utilise cette prop pour déterminer le langage
+  isJsx = true,
   stats,
 }) {
   const combinedLines = [...targetLines, ...parentLines].sort((a, b) => a - b);
   const displayLines = combinedLines.length > 0 ? combinedLines.join(", ") : "";
-
-  // 🟢 Détermine le langage pour SyntaxHighlighter
   const language = isJsx ? "jsx" : "css";
 
   return (
@@ -32,6 +30,7 @@ export default function CodePanel({
         </div>
       </div>
 
+      {/* Stats CSS */}
       {!isJsx && stats && (
         <div className={styles.statsBar}>
           <span className={styles.statTag}>📏 {stats.size}</span>
@@ -49,11 +48,46 @@ export default function CodePanel({
         </div>
       )}
 
+      {/* Barre de Props (JSX) */}
+      {isJsx && stats && stats.props && Object.keys(stats.props).length > 0 && (
+        <div
+          style={{
+            padding: "8px 12px",
+            background: "#0d1117",
+            borderBottom: "1px solid #30363d",
+            fontSize: "11px",
+            fontFamily: "monospace",
+            color: "#8b949e",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "8px",
+            alignItems: "center",
+          }}
+        >
+          <span style={{ fontWeight: "bold", color: "#a371f7" }}>PROPS:</span>
+          {Object.entries(stats.props).map(([key, value]) => (
+            <span
+              key={key}
+              style={{
+                background: "#161b22",
+                padding: "2px 6px",
+                borderRadius: "4px",
+                border: "1px solid #30363d",
+              }}
+            >
+              <span style={{ color: "#79c0ff" }}>{key}</span>
+              <span style={{ color: "#8b949e" }}>=</span>
+              <span style={{ color: "#a5d6ff" }}>{String(value)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className={styles.codeWrapper}>
         {sourceCode ? (
           <CodeViewer
             sourceCode={sourceCode}
-            language={language} // 🟢 On passe la prop
+            language={language}
             highlightTargetLines={targetLines}
             highlightParentLines={parentLines}
           />

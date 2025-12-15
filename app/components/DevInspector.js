@@ -17,7 +17,7 @@ const IGNORED_COMPONENTS = [
   "CodeViewer", // Nos outils
   "SegmentViewNode",
   "SegmentStateProvider",
-  "OuterLayoutRouter", // 👈 AJOUTÉ ICI
+  "OuterLayoutRouter",
   "LayoutRouterContext",
   "InnerLayoutRouter",
   "RedirectErrorBoundary",
@@ -48,25 +48,24 @@ export default function DevInspector({ children }) {
     const handleMouseOver = async (e) => {
       const target = e.target;
 
-      // 🛑 NOUVEAU FILTRE : Ignorer l'inspecteur lui-même et ses sous-composants
-      if (
-        target.tagName === "BODY" ||
-        target.tagName === "HTML" ||
-        target.id === "inspector"
-      )
-        return;
-
-      // Vérifie si l'élément survolé fait partie de l'inspecteur (panneaux de code)
+      // 🛑 FILTRE : Ignorer l'interface de l'inspecteur
+      // On vérifie si l'élément fait partie de notre panneau d'outils
       const inspectorElement = document.getElementById("inspector");
       if (
         inspectorElement &&
         inspectorElement.contains(target) &&
         target.closest(`.${styles.inspectorPanel}`)
       ) {
-        // Si l'élément est à l'intérieur d'un panneau de code, on ignore l'événement
-        target.style.outline = ""; // Enlève l'outline si elle était restée
         return;
       }
+
+      // Ignorer les balises structurelles de base
+      if (
+        target.tagName === "BODY" ||
+        target.tagName === "HTML" ||
+        target.id === "inspector"
+      )
+        return;
 
       const fiber = getFiberFromElement(target);
       if (!fiber) return;
@@ -88,8 +87,6 @@ export default function DevInspector({ children }) {
       }
 
       if (!componentName) return;
-
-      // ... (Le reste de la logique reste inchangé) ...
 
       const jsxFileName = `app/components/${componentName}.jsx`;
       const cssFileName = `app/components/${componentName}.module.css`;
@@ -123,15 +120,13 @@ export default function DevInspector({ children }) {
           if (resJsx.ok) {
             const data = await resJsx.json();
             fileCache[jsxFileName] = data.content;
-          } else {
-            fileCache[jsxFileName] = null;
           }
 
           if (resCss.ok) {
             const data = await resCss.json();
             fileCache[cssFileName] = data.content;
           } else {
-            fileCache[cssFileName] = "";
+            fileCache[cssFileName] = ""; // Marquer comme vide pour éviter le re-fetch
           }
         } catch (err) {
           console.error("Erreur lecture fichiers:", err);
@@ -149,7 +144,9 @@ export default function DevInspector({ children }) {
       const cleanText = target.innerText
         ? target.innerText.replace(/\s+/g, " ").trim().substring(0, 30)
         : "";
-      const jsxLine = findLineInSource(
+
+      // 👇 IMPORTANT : findLineInSource retourne maintenant un TABLEAU de lignes (ex: [10, 11, 12])
+      const jsxLines = findLineInSource(
         jsxSourceCode,
         target.tagName,
         target.getAttribute("class"),
@@ -157,29 +154,43 @@ export default function DevInspector({ children }) {
         propSignature
       );
 
-      // 5. ANALYSE CSS
+      // 5. ANALYSE CSS (Retourne aussi un tableau)
       const rawClasses = target.getAttribute("class") || "";
-      const cssLine = findCssLineInSource(cssSourceCode, rawClasses);
+      const cssLines = cssSourceCode
+        ? findCssLineInSource(cssSourceCode, rawClasses)
+        : [];
 
-      if (jsxLine) {
+      // 6. STATISTIQUES (Box Model)
+      const computed = window.getComputedStyle(target);
+      const stats = {
+        size: `${Math.round(parseFloat(computed.width))} x ${Math.round(
+          parseFloat(computed.height)
+        )}`,
+        margin: computed.margin === "0px" ? "" : `M: ${computed.margin}`,
+        padding: computed.padding === "0px" ? "" : `P: ${computed.padding}`,
+        display: computed.display,
+      };
+
+      // Si on a trouvé du code JSX correspondant
+      if (jsxLines.length > 0) {
         setTargetInfo({
           component: componentName,
           jsxFile: jsxFileName,
-          jsxLine: jsxLine,
+          jsxLines: jsxLines, // 👈 On passe le tableau directement (plus de [ ])
           jsxSourceCode: jsxSourceCode,
           cssFile: cssFileName,
-          cssLine: cssLine,
+          cssLines: cssLines, // 👈 Tableau CSS
           cssSourceCode: cssSourceCode,
           element: target.tagName.toLowerCase(),
+          stats: stats,
         });
         target.style.outline = "2px solid #00ff00";
       }
     };
 
     const handleMouseOut = (e) => {
-      // 🛑 FILTRE MOUSEOUT : S'assurer que le mouseout n'est traité que si on quitte un élément de l'application
+      // 🛑 FILTRE MOUSEOUT
       const inspectorElement = document.getElementById("inspector");
-      // Si l'élément que l'on quitte est à l'intérieur d'un panneau de l'inspecteur, on ignore
       if (
         inspectorElement &&
         inspectorElement.contains(e.target) &&
@@ -202,22 +213,23 @@ export default function DevInspector({ children }) {
   return (
     // CONTENEUR GLOBAL: Triple Split
     <div className={styles.containerTripleSplit} id="inspector">
-      {/* 1. GAUCHE : Panneau JSX (Fait partie de l'inspecteur, doit être ignoré par l'écouteur) */}
+      {/* 1. GAUCHE : Panneau JSX */}
       <CodePanel
         title={`⚛️ ${targetInfo?.component || "JSX"}`}
         fileInfo={targetInfo?.jsxFile}
-        line={targetInfo?.jsxLine}
+        lines={targetInfo?.jsxLines} // Tableau de lignes
         sourceCode={targetInfo?.jsxSourceCode}
         isJsx={true}
       />
 
-      {/* 2. CENTRE : Panneau CSS (Fait partie de l'inspecteur, doit être ignoré par l'écouteur) */}
+      {/* 2. CENTRE : Panneau CSS */}
       <CodePanel
         title={`🎨 CSS (${targetInfo?.component || "Styles"})`}
         fileInfo={targetInfo?.cssFile}
-        line={targetInfo?.cssLine}
+        lines={targetInfo?.cssLines} // Tableau de lignes
         sourceCode={targetInfo?.cssSourceCode}
         isJsx={false}
+        stats={targetInfo?.stats} // Passage des stats
       />
 
       {/* 3. DROITE : Votre Application */}

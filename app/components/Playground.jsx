@@ -16,7 +16,10 @@ export default function Playground() {
 
       <p>Salut les amis !</p>
 
-      <button onClick={() => setCount(count + 1)} className={styles.button}>
+      <button
+        onClick={() => setCount(count + 1)}
+        className={`${styles.button} ${styles.testButton}`}
+      >
         Compteur : {count}
       </button>
     </div>

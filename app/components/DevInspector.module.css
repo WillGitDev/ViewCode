@@ -78,3 +78,23 @@
   position: relative;
   background-color: #000;
 }
+.statsBar {
+  background-color: #0f172a; /* Bleu nuit profond */
+  padding: 8px 16px;
+  border-bottom: 1px solid #30363d;
+  display: flex;
+  gap: 12px;
+  font-family: monospace;
+  font-size: 12px;
+  flex-wrap: wrap;
+  flex-shrink: 0; /* Empêche l'écrasement si manque de place */
+}
+
+.statTag {
+  background-color: #1e293b;
+  color: #e2e8f0;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid #334155;
+  white-space: nowrap;
+}

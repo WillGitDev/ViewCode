@@ -36,3 +36,7 @@
 .button:hover {
   background-color: #7e22ce; /* Violet plus foncé */
 }
+
+.testButton {
+  color: red;
+}

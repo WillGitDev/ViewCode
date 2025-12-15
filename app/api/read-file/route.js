@@ -1,35 +1,37 @@
 // app/api/read-file/route.js
-import fs from "fs";
+import { NextResponse } from "next/server";
+import fs from "fs/promises";
 import path from "path";
 
-export async function GET(request) {
-  // La Request n'a plus de type explicite ici
-  const { searchParams } = new URL(request.url);
+export async function GET(req) {
+  const { searchParams } = new URL(req.url);
   const filePath = searchParams.get("path");
 
+  // --- 🕵️‍♂️ ZONE DE DIAGNOSTIC ---
+  console.log("\n--- TENTATIVE DE LECTURE ---");
+
   if (!filePath) {
-    return new Response(JSON.stringify({ error: "Missing file path" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    console.log("❌ Erreur : Aucun chemin fourni dans l'URL");
+    return NextResponse.json({ error: "Chemin manquant" }, { status: 400 });
   }
 
-  // Correction : L'utilisation de 'process.cwd()' permet de partir de la racine du projet
-  const absolutePath = path.join(process.cwd(), filePath);
-
   try {
-    const content = fs.readFileSync(absolutePath, "utf-8");
-    return new Response(JSON.stringify({ content }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    const racineProjet = process.cwd();
+    // console.log("📥 Chemin demandé :", filePath);
+
+    const fullPath = path.join(racineProjet, filePath);
+
+    // Lecture du fichier
+    const fileContent = await fs.readFile(fullPath, "utf-8");
+
+    // console.log("✅ SUCCÈS : Fichier lu !");
+    return NextResponse.json({ content: fileContent });
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: `File not found at ${absolutePath}` }),
-      {
-        status: 404,
-        headers: { "Content-Type": "application/json" },
-      }
+    console.log("❌ ÉCHEC : Fichier introuvable ->", filePath);
+
+    return NextResponse.json(
+      { error: "Fichier introuvable", details: String(error) },
+      { status: 404 }
     );
   }
 }

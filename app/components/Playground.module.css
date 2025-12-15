@@ -1,0 +1,38 @@
+/* app/components/Playground.module.css */
+.card {
+  padding: 2.5rem;
+  background-color: #f3f4f6; /* Gris clair */
+  border-radius: 0.75rem;
+  border: 2px solid #d1d5db;
+  text-align: center;
+  max-width: 600px;
+  margin: 40px auto; /* Centré horizontalement */
+  color: #1f2937;
+}
+
+.title {
+  font-size: 1.875rem;
+  font-weight: bold;
+  color: #9333ea; /* Violet */
+  margin-bottom: 1rem;
+}
+
+.description {
+  color: #4b5563; /* Gris foncé */
+  margin-bottom: 1.5rem;
+}
+
+.button {
+  padding: 0.5rem 1.5rem;
+  background-color: #9333ea;
+  color: white;
+  border-radius: 0.25rem;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  font-size: 1rem;
+}
+
+.button:hover {
+  background-color: #7e22ce; /* Violet plus foncé */
+}

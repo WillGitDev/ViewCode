@@ -4,8 +4,11 @@
 import { useEffect, useState, useRef } from "react";
 import { getFiberFromElement } from "../utils/fiber-inspector";
 import { findLineInSource } from "../utils/source-matcher";
-import CodeViewer from "./CodeViewer";
+import { findCssLineInSource } from "../utils/css-matcher";
+import CodePanel from "./CodePanel";
+import styles from "./DevInspector.module.css";
 
+// Cache pour stocker les fichiers déjà lus
 const fileCache = {};
 
 export default function DevInspector({ children }) {
@@ -15,79 +18,128 @@ export default function DevInspector({ children }) {
   useEffect(() => {
     const handleMouseOver = async (e) => {
       const target = e.target;
-      if (target.tagName === "BODY" || target.tagName === "HTML") return;
+      // Ignore les éléments de structure globaux
+      if (
+        target.tagName === "BODY" ||
+        target.tagName === "HTML" ||
+        target.id === "inspector"
+      )
+        return;
 
       const fiber = getFiberFromElement(target);
       if (!fiber) return;
 
-      // 1. Récupérer le nom du composant
+      // 1. DÉTECTION DU COMPOSANT
       let current = fiber;
       let componentName = null;
       while (current) {
         if (current.type && typeof current.type === "function") {
           componentName = current.type.name || current.type.displayName;
-          if (componentName && componentName !== "DevInspector") break;
+          // On ignore nos propres composants d'outillage
+          if (
+            componentName &&
+            !["DevInspector", "CodePanel", "CodeViewer"].includes(componentName)
+          )
+            break;
         }
         current = current.return;
       }
       if (!componentName) return;
 
-      // 2. EXTRACTION INTELLIGENTE : On récupère le code du onClick
-      // React stocke les props actuelles dans memoizedProps
+      // Chemins supposés
+      const jsxFileName = `app/components/${componentName}.jsx`;
+      const cssFileName = `app/components/${componentName}.module.css`;
+
+      // 2. RÉCUPÉRATION DU CODE ONCLICK (Signature)
       let propSignature = null;
       if (fiber.memoizedProps && fiber.memoizedProps.onClick) {
         try {
-          // Convertit la fonction en chaîne : "() => setCount(count + 1)"
-          const fnString = fiber.memoizedProps.onClick.toString();
-          // On nettoie pour faciliter la recherche (enlève les espaces multiples)
-          propSignature = fnString.replace(/\s+/g, " ").trim();
-          console.log("⚡ Signature trouvée :", propSignature);
+          propSignature = fiber.memoizedProps.onClick
+            .toString()
+            .replace(/\s+/g, " ")
+            .trim();
         } catch (err) {
           /* Ignorer */
         }
       }
 
-      const fileName = `app/components/${componentName}.jsx`;
-      let sourceCode = fileCache[fileName];
-
-      if (!sourceCode && !isFetchingRef.current) {
+      // 3. CHARGEMENT DES FICHIERS (JSX et CSS)
+      // On ne lance la requête que si les fichiers ne sont pas en cache
+      if (
+        (!fileCache[jsxFileName] || !fileCache[cssFileName]) &&
+        !isFetchingRef.current
+      ) {
         isFetchingRef.current = true;
         try {
-          const res = await fetch(`/api/read-file?path=${fileName}`);
-          if (res.ok) {
-            const data = await res.json();
-            sourceCode = data.content;
-            fileCache[fileName] = sourceCode;
+          // On essaie de charger les deux en parallèle
+          const [resJsx, resCss] = await Promise.all([
+            fetch(`/api/read-file?path=${jsxFileName}`),
+            fetch(`/api/read-file?path=${cssFileName}`),
+          ]);
+
+          if (resJsx.ok) {
+            const data = await resJsx.json();
+            fileCache[jsxFileName] = data.content;
+          }
+          if (resCss.ok) {
+            const data = await resCss.json();
+            fileCache[cssFileName] = data.content;
+          } else {
+            // Si pas de CSS trouvé, on cache une chaine vide pour ne pas réessayer en boucle
+            fileCache[cssFileName] = "";
           }
         } catch (err) {
-          console.error(err);
+          console.error("Erreur lecture fichiers:", err);
         } finally {
           isFetchingRef.current = false;
         }
       }
 
-      if (!sourceCode) return;
+      const jsxSourceCode = fileCache[jsxFileName];
+      const cssSourceCode = fileCache[cssFileName];
 
+      if (!jsxSourceCode) return;
+
+      // 4. ANALYSE JSX (Trouver la ligne du composant)
       const cleanText = target.innerText
         ? target.innerText.replace(/\s+/g, " ").trim().substring(0, 30)
         : "";
-
-      // 3. Appel avec le nouvel argument `propSignature`
-      const lineNumber = findLineInSource(
-        sourceCode,
+      const jsxLine = findLineInSource(
+        jsxSourceCode,
         target.tagName,
         target.getAttribute("class"),
         cleanText,
-        propSignature // 👈 LE NOUVEL INDICE
+        propSignature
       );
 
-      if (lineNumber) {
+      // 5. ANALYSE CSS (Trouver la ligne du style)
+      let cssLine = null;
+      const classUsed = target.getAttribute("class");
+      if (cssSourceCode && classUsed) {
+        // On filtre pour ne garder que les classes qui ressemblent à des modules (avec un underscore)
+        const classes = classUsed.split(" ").filter((c) => c.includes("_"));
+        for (const rawClass of classes) {
+          const line = findCssLineInSource(cssSourceCode, rawClass);
+          if (line) {
+            cssLine = line;
+            break; // On s'arrête à la première classe trouvée
+          }
+        }
+      }
+
+      if (jsxLine) {
         setTargetInfo({
-          file: fileName,
-          line: lineNumber,
-          sourceCode: sourceCode,
-          element: target.tagName.toLowerCase(),
           component: componentName,
+          // Données JSX
+          jsxFile: jsxFileName,
+          jsxLine: jsxLine,
+          jsxSourceCode: jsxSourceCode,
+          // Données CSS
+          cssFile: cssFileName,
+          cssLine: cssLine,
+          cssSourceCode: cssSourceCode,
+          // Infos élément
+          element: target.tagName.toLowerCase(),
         });
         target.style.outline = "2px solid #00ff00";
       }
@@ -95,7 +147,6 @@ export default function DevInspector({ children }) {
 
     const handleMouseOut = (e) => {
       e.target.style.outline = "";
-      setTargetInfo(null);
     };
 
     document.addEventListener("mouseover", handleMouseOver);
@@ -108,46 +159,28 @@ export default function DevInspector({ children }) {
   }, []);
 
   return (
-    <>
-      <div style={{ marginBottom: "50vh", transition: "margin-bottom 0.3s" }}>
-        {children}
-      </div>
-      <div
-        style={{
-          position: "fixed",
-          bottom: 0,
-          left: 0,
-          width: "100%",
-          height: "50vh",
-          backgroundColor: "#0d1117",
-          borderTop: "1px solid #30363d",
-          boxShadow: "0 -4px 20px rgba(0,0,0,0.5)",
-          zIndex: 10000,
-          display: "flex",
-          flexDirection: "column",
-          transform: targetInfo ? "translateY(0)" : "translateY(100%)",
-          transition: "transform 0.3s ease-in-out",
-        }}
-      >
-        <div className="flex items-center justify-between px-4 py-2 bg-[#161b22] border-b border-[#30363d]">
-          <div className="flex items-center gap-3">
-            <span className="text-purple-400 font-bold text-sm">
-              ⚛️ {targetInfo?.component}
-            </span>
-            {targetInfo && (
-              <span className="text-xs text-gray-500 font-mono bg-gray-800 px-2 py-1 rounded">
-                {targetInfo.file}:{targetInfo.line}
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="flex-grow overflow-hidden relative">
-          <CodeViewer
-            sourceCode={targetInfo?.sourceCode}
-            highlightLine={targetInfo?.line}
-          />
-        </div>
-      </div>
-    </>
+    // CONTENEUR GLOBAL: Triple Split
+    <div className={styles.containerTripleSplit} id="inspector">
+      {/* 1. GAUCHE : Panneau JSX */}
+      <CodePanel
+        title={`⚛️ ${targetInfo?.component || "JSX"}`}
+        fileInfo={targetInfo?.jsxFile}
+        line={targetInfo?.jsxLine}
+        sourceCode={targetInfo?.jsxSourceCode}
+        isJsx={true}
+      />
+
+      {/* 2. CENTRE : Panneau CSS */}
+      <CodePanel
+        title={`🎨 CSS (${targetInfo?.component || "Styles"})`}
+        fileInfo={targetInfo?.cssFile}
+        line={targetInfo?.cssLine}
+        sourceCode={targetInfo?.cssSourceCode}
+        isJsx={false}
+      />
+
+      {/* 3. DROITE : Votre Application */}
+      <div className={styles.appContentTripleSplit}>{children}</div>
+    </div>
   );
 }

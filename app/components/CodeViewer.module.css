@@ -1,0 +1,56 @@
+/* app/components/CodeViewer.module.css */
+.viewerContainer {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  padding: 1rem;
+  background-color: #0d1117;
+  color: #c9d1d9;
+  font-family: "Courier New", Courier, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.emptyState {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #484f58;
+}
+
+.line {
+  display: flex;
+  width: 100%;
+}
+
+.line:hover {
+  background-color: #161b22;
+}
+
+.lineHighlighted {
+  background-color: #373e47;
+  border-left: 4px solid #a371f7; /* Bordure violette */
+  color: white;
+}
+
+.lineNumber {
+  width: 3rem;
+  text-align: right;
+  padding-right: 1rem;
+  flex-shrink: 0;
+  user-select: none;
+  color: #484f58;
+}
+
+.lineHighlighted .lineNumber {
+  color: #c9d1d9;
+  font-weight: bold;
+}
+
+.code {
+  flex-grow: 1;
+  white-space: pre;
+  margin: 0;
+  font-family: inherit;
+}

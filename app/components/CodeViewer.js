@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import styles from "./CodeViewer.module.css"; // 👈 Import
 
 export default function CodeViewer({ sourceCode, highlightLine }) {
   const codeRef = useRef(null);
@@ -20,8 +21,10 @@ export default function CodeViewer({ sourceCode, highlightLine }) {
 
   if (!sourceCode) {
     return (
-      <div className="h-full flex items-center justify-center text-gray-500 bg-[#0d1117]">
-        <p>Survolez un élément pour voir son code source.</p>
+      <div className={styles.viewerContainer}>
+        <div className={styles.emptyState}>
+          <p>Survolez un élément pour voir son code source.</p>
+        </div>
       </div>
     );
   }
@@ -29,11 +32,7 @@ export default function CodeViewer({ sourceCode, highlightLine }) {
   const lines = sourceCode.split("\n");
 
   return (
-    // CHANGEMENT ICI : h-full, w-full et suppression de max-h-60
-    <div
-      className="text-sm font-mono bg-[#0d1117] text-gray-300 h-full w-full overflow-auto p-4"
-      ref={codeRef}
-    >
+    <div className={styles.viewerContainer} ref={codeRef}>
       {lines.map((lineContent, index) => {
         const lineNumber = index + 1;
         const isHighlighted = lineNumber === highlightLine;
@@ -41,24 +40,13 @@ export default function CodeViewer({ sourceCode, highlightLine }) {
         return (
           <div
             key={lineNumber}
-            className={`flex w-full ${
-              isHighlighted
-                ? "bg-[#373e47] text-white border-l-4 border-purple-500" // Style plus "GitHub Dark"
-                : "hover:bg-[#161b22]"
+            // Utilisation conditionnelle des classes CSS Modules
+            className={`${styles.line} ${
+              isHighlighted ? styles.lineHighlighted : ""
             }`}
           >
-            {/* Numéro de ligne fixe */}
-            <span
-              className={`w-12 text-right pr-4 flex-shrink-0 select-none ${
-                isHighlighted ? "text-gray-200 font-bold" : "text-gray-600"
-              }`}
-            >
-              {lineNumber}
-            </span>
-            {/* Code */}
-            <pre className="flex-grow whitespace-pre bg-transparent m-0 font-inherit">
-              {lineContent}
-            </pre>
+            <span className={styles.lineNumber}>{lineNumber}</span>
+            <pre className={styles.code}>{lineContent}</pre>
           </div>
         );
       })}

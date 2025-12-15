@@ -1,22 +1,25 @@
 /* app/components/DevInspector.module.css */
-.container {
+
+/* Conteneur global */
+.containerTripleSplit {
   display: flex;
   width: 100vw;
   height: 100vh;
   overflow: hidden;
 }
 
-/* Colonne Gauche : L'outil */
+/* Style commun pour les panneaux d'outils (Gauche et Centre) */
 .inspectorPanel {
-  width: 50%;
+  width: calc(100vw / 3); /* Un tiers de l'écran */
   height: 100%;
-  background-color: #0d1117; /* Gris très foncé (GitHub Dark) */
+  background-color: #0d1117;
   border-right: 1px solid #30363d;
   display: flex;
   flex-direction: column;
   z-index: 100;
 }
 
+/* Zone d'en-tête de panneau */
 .header {
   display: flex;
   align-items: center;
@@ -28,16 +31,19 @@
 }
 
 .title {
-  color: #a371f7; /* Violet */
+  color: #a371f7;
   font-weight: bold;
   font-size: 14px;
   display: flex;
   align-items: center;
   gap: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .fileInfo {
-  font-size: 12px;
+  font-size: 11px;
   color: #8b949e;
   background-color: #21262d;
   padding: 2px 6px;
@@ -45,22 +51,30 @@
   font-family: monospace;
 }
 
-.tagInfo {
-  font-size: 12px;
-  color: #8b949e;
-}
-
+/* Zone qui contient le CodeViewer */
 .codeWrapper {
   flex-grow: 1;
-  overflow: hidden;
+  overflow: hidden; /* Important pour que CodeViewer gère son scroll */
   position: relative;
 }
 
-/* Colonne Droite : Votre Site */
-.appContent {
-  width: 50%;
+/* Message quand rien n'est affiché */
+.emptyCodeWrapper {
   height: 100%;
-  overflow-y: auto; /* Le scroll est ici */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #484f58;
+  padding: 20px;
+  text-align: center;
+  font-size: 13px;
+}
+
+/* Zone de l'application (Droite) */
+.appContentTripleSplit {
+  width: calc(100vw / 3);
+  height: 100%;
+  overflow-y: auto;
   position: relative;
   background-color: #000;
 }

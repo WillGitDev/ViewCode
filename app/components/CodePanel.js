@@ -7,19 +7,24 @@ import styles from "./DevInspector.module.css";
 export default function CodePanel({
   title,
   fileInfo,
-  lines = [], // 👈 Reçoit maintenant un tableau
+  targetLines = [], // Reçoit les lignes vertes
+  parentLines = [], // Reçoit les lignes violettes
   sourceCode,
   isJsx = true,
   stats,
 }) {
+  // Pour l'info-bulle en haut, on combine tout
+  const combinedLines = [...targetLines, ...parentLines].sort((a, b) => a - b);
+  const displayLines = combinedLines.length > 0 ? combinedLines.join(", ") : "";
+
   return (
     <div className={styles.inspectorPanel}>
       <div className={styles.header}>
         <div className={styles.title}>
           <span>{title}</span>
-          {fileInfo && lines.length > 0 && (
+          {fileInfo && combinedLines.length > 0 && (
             <span className={styles.fileInfo}>
-              {fileInfo}:{lines.join(", ")}
+              {fileInfo}:{displayLines}
             </span>
           )}
         </div>
@@ -44,8 +49,11 @@ export default function CodePanel({
 
       <div className={styles.codeWrapper}>
         {sourceCode ? (
-          // 👇 Passe le tableau 'lines' à 'highlightLines'
-          <CodeViewer sourceCode={sourceCode} highlightLines={lines} />
+          <CodeViewer
+            sourceCode={sourceCode}
+            highlightTargetLines={targetLines}
+            highlightParentLines={parentLines}
+          />
         ) : (
           <div className={styles.emptyCodeWrapper}>
             {isJsx

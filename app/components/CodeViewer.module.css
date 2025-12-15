@@ -35,6 +35,23 @@
   color: white;
 }
 
+.line:hover {
+  background-color: #161b22;
+}
+
+/* 🟢 Style pour l'ÉLÉMENT CIBLE (Enfant) - Couleur verte */
+.lineHighlightedTarget {
+  background-color: #1f3724; /* Vert foncé */
+  border-left: 4px solid #00ff00; /* Vert vif */
+  color: white;
+}
+
+/* 🟢 Style pour l'ÉLÉMENT PARENT - Couleur violette */
+.lineHighlightedParent {
+  background-color: #2e263d; /* Violet foncé */
+  border-left: 4px solid #a371f7; /* Violet vif */
+  color: #e2e8f0;
+}
 .lineNumber {
   width: 3rem;
   text-align: right;

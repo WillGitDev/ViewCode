@@ -12,124 +12,105 @@ export default function DevInspector() {
   const [highlightRange, setHighlightRange] = useState(null);
   const previewRef = useRef(null);
 
-  // --- 1. FONCTION MAGIQUE : Récupère les infos cachées de React ---
-  const getReactInfo = (domElement) => {
-    // Cherche la clé interne de React (commence par __reactFiber)
+  // --- 1. LE SCANNER PROFOND (Traverse le DOM et React Fiber) ---
+  const findSourceInFiber = (domElement) => {
+    // Clé interne de React
     const key = Object.keys(domElement).find((k) =>
       k.startsWith("__reactFiber")
     );
     if (!key) return null;
 
-    const fiber = domElement[key];
+    let fiber = domElement[key];
 
-    // Cherche la source (_debugSource) sur l'élément ou son parent
-    let source = fiber._debugSource;
-    if (!source && fiber.return) {
-      source = fiber.return._debugSource;
-    }
-
-    if (source) {
-      return {
-        fileName: source.fileName, // Chemin absolu complet
-        lineNumber: source.lineNumber, // Numéro de ligne de début
-      };
+    // On remonte l'arbre React (jusqu'à 20 niveaux) pour trouver une trace de fichier
+    for (let i = 0; i < 20; i++) {
+      if (fiber?._debugSource) {
+        return fiber._debugSource;
+      }
+      fiber = fiber?.return;
     }
     return null;
   };
 
-  // --- 2. GESTION DU SURVOL (Le Cerveau) ---
   const handleMouseOver = (e) => {
-    e.stopPropagation();
-    const target = e.target;
+    // Important : On laisse l'événement bouillonner
+    let target = e.target;
+    let foundSource = null;
 
-    // On ignore si on survole le conteneur principal lui-même
-    if (target === previewRef.current) return;
+    // BOUCLE DOM : On remonte les parents HTML un par un
+    while (target && target !== previewRef.current && !foundSource) {
+      // Pour chaque élément HTML, on lance le SCANNER REACT
+      foundSource = findSourceInFiber(target);
 
-    // Effet visuel immédiat
-    target.style.outline = "2px dashed #10b981";
-    target.style.cursor = "help";
+      if (foundSource) {
+        // BINGO ! On a trouvé.
+        break;
+      }
+      // Sinon on passe au parent HTML
+      target = target.parentElement;
+    }
 
-    // On récupère les infos
-    const reactInfo = getReactInfo(target);
-    let relativePath = null;
-    let lines = null;
+    if (foundSource) {
+      // Effet visuel sur l'élément HTML précis (target)
+      target.style.outline = "2px dashed #10b981"; // Vert Hacker
+      target.style.cursor = "help";
 
-    if (reactInfo) {
-      let fullPath = reactInfo.fileName;
+      // Nettoyage du chemin (compatible Windows/Turbopack)
+      let fullPath = foundSource.fileName.replace(/\\/g, "/");
+      let relativePath = fullPath;
 
-      // --- CORRECTION SPECIAL WINDOWS ET NEXT.JS ---
-      // 1. On normalise les slashs (Windows utilise \ mais le web utilise /)
-      fullPath = fullPath.replace(/\\/g, "/");
-
-      // 2. On cherche où commence le dossier "app"
-      const appIndex = fullPath.indexOf("/app/");
-
-      if (appIndex !== -1) {
-        // CAS 1 : On a trouvé "/app/", on prend tout ce qui suit (ex: app/components/Playground.tsx)
-        relativePath = fullPath.substring(appIndex + 1);
-      } else {
-        // CAS 2 (Fallback) : Si le chemin est bizarre, on force la structure que l'on connaît
-        // On prend juste le nom du fichier (Playground.tsx)
-        const fileName = fullPath.split("/").pop();
-        // Et on ajoute manuellement le dossier
-        relativePath = `app/components/${fileName}`;
+      // On extrait la partie utile du chemin
+      if (fullPath.includes("app/")) {
+        relativePath = fullPath.substring(fullPath.indexOf("app/"));
+      } else if (fullPath.includes("components/")) {
+        relativePath = fullPath.substring(fullPath.indexOf("components/"));
       }
 
-      // On définit la zone à surligner
-      const startLine = reactInfo.lineNumber;
-      // On surligne la ligne de départ + 4 lignes pour donner du contexte
-      lines = { start: startLine, end: startLine + 4 };
-    }
+      console.log(
+        "✅ Détecté :",
+        relativePath,
+        "Ligne :",
+        foundSource.lineNumber
+      );
 
-    // Chargement du code source si nécessaire
-    if (
-      relativePath &&
-      (!selectedElement || selectedElement.sourceFile !== relativePath)
-    ) {
-      fetchSourceCode(relativePath);
-    }
+      const startLine = foundSource.lineNumber;
 
-    // Mise à jour de l'état
-    setHighlightRange(lines);
-    setSelectedElement({
-      tag: target.tagName.toLowerCase(),
-      sourceFile: relativePath || "Non détecté",
-    });
+      if (!selectedElement || selectedElement.sourceFile !== relativePath) {
+        fetchSourceCode(relativePath);
+      }
+
+      setHighlightRange({ start: startLine, end: startLine + 4 });
+      setSelectedElement({
+        tag: target.tagName.toLowerCase(),
+        sourceFile: relativePath,
+      });
+    }
   };
 
   const handleMouseOut = (e) => {
-    e.target.style.outline = "";
+    if (e.target) e.target.style.outline = "";
     setHighlightRange(null);
   };
 
-  // --- 3. APPEL API (Lecture du fichier) ---
+  // --- APPEL API (Inchangé) ---
   const fetchSourceCode = useCallback(async (filePath) => {
-    if (!filePath) return;
     try {
       const res = await fetch(
         `/api/read-file?path=${encodeURIComponent(filePath)}`
       );
       const data = await res.json();
-      if (res.ok) {
-        setSourceCode(data.content);
-      } else {
-        console.error("Erreur API:", data.error);
-        // Optionnel : Afficher l'erreur dans l'éditeur pour debug
-        setSourceCode(
-          `// Erreur : Impossible de lire ${filePath}\n// Vérifie que le fichier existe bien à cet endroit.`
-        );
-      }
+      if (res.ok) setSourceCode(data.content);
     } catch (err) {
-      console.error("Erreur Réseau:", err);
+      console.error(err);
     }
   }, []);
 
   return (
     <div className="flex h-screen bg-[#1e1e1e] text-white font-sans overflow-hidden">
-      {/* GAUCHE : Aperçu */}
+      {/* GAUCHE */}
       <div className="w-1/2 flex flex-col border-r border-gray-700">
-        <div className="bg-[#252526] p-2 text-xs text-gray-400 text-center uppercase tracking-widest">
-          Aperçu Interactif
+        <div className="bg-[#252526] p-2 text-xs text-gray-400 text-center uppercase">
+          Aperçu (Scanner Fiber Profond)
         </div>
         <div
           ref={previewRef}
@@ -141,49 +122,40 @@ export default function DevInspector() {
         </div>
       </div>
 
-      {/* DROITE : Code Source */}
+      {/* DROITE */}
       <div className="w-1/2 flex flex-col bg-[#1e1e1e]">
-        <div className="bg-[#252526] p-3 text-xs text-gray-400 border-b border-black flex justify-between uppercase tracking-widest">
+        <div className="bg-[#252526] p-3 text-xs text-gray-400 border-b border-black flex justify-between uppercase">
           <span>{selectedElement?.sourceFile || "..."}</span>
           {highlightRange && (
-            <span className="text-green-400 font-bold">
-              Ligne {highlightRange.start}
-            </span>
+            <span className="text-green-400">Ligne {highlightRange.start}</span>
           )}
         </div>
-
         <div className="flex-1 overflow-auto text-sm custom-scrollbar">
-          {sourceCode ? (
-            <SyntaxHighlighter
-              language="tsx"
-              style={vscDarkPlus}
-              showLineNumbers={true}
-              wrapLines={true}
-              customStyle={{
-                margin: 0,
-                padding: "20px",
-                backgroundColor: "#1e1e1e",
-              }}
-              lineProps={(lineNumber) => {
-                const style = { display: "block", width: "100%" };
-                if (
-                  highlightRange &&
-                  lineNumber >= highlightRange.start &&
-                  lineNumber <= highlightRange.end
-                ) {
-                  style.backgroundColor = "rgba(46, 76, 52, 0.6)";
-                  style.borderLeft = "4px solid #4ade80";
-                }
-                return { style };
-              }}
-            >
-              {sourceCode}
-            </SyntaxHighlighter>
-          ) : (
-            <div className="text-gray-500 italic mt-10 text-center">
-              Survole un élément à gauche pour voir son code...
-            </div>
-          )}
+          <SyntaxHighlighter
+            language="tsx"
+            style={vscDarkPlus}
+            showLineNumbers={true}
+            wrapLines={true}
+            customStyle={{
+              margin: 0,
+              padding: "20px",
+              backgroundColor: "#1e1e1e",
+            }}
+            lineProps={(lineNumber) => {
+              const style = { display: "block", width: "100%" };
+              if (
+                highlightRange &&
+                lineNumber >= highlightRange.start &&
+                lineNumber <= highlightRange.end
+              ) {
+                style.backgroundColor = "rgba(46, 76, 52, 0.6)";
+                style.borderLeft = "4px solid #4ade80";
+              }
+              return { style };
+            }}
+          >
+            {sourceCode || "// Le code s'affichera ici"}
+          </SyntaxHighlighter>
         </div>
       </div>
     </div>

@@ -15,6 +15,7 @@
     "react-syntax-highlighter": "^16.1.0"
   },
   "devDependencies": {
+    "@locator/babel-jsx": "^0.5.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
